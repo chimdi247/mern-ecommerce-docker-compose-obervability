@@ -95,7 +95,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256m
+          memory: 512m
     networks:
       - ecommerce-network
 
@@ -118,7 +118,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256m
+          memory: 512m
     networks:
       - ecommerce-network
 
@@ -171,7 +171,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256m
+          memory: 512m
     networks:
       - ecommerce-network
 
@@ -206,7 +206,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 128m
+          memory: 512m
     networks:
       - ecommerce-network
 
@@ -245,7 +245,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256m
+          memory: 512m
     networks:
       - ecommerce-network
 
@@ -266,7 +266,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 128m
+          memory: 512m
     networks:
       - ecommerce-network
 
