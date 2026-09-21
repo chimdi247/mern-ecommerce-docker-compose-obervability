@@ -13,9 +13,9 @@ COPY . .
 # VITE_* variables are inlined into the bundle at build time, so these
 # must be build args (see docker-compose.yml's client.build.args), not
 # just runtime env vars.
-ARG VITE_BACKEND_URL=http://localhost:5000
+ARG VITE_BACKEND_URL=http://40.127.12.130:5000
 ENV VITE_BACKEND_URL=${VITE_BACKEND_URL}
-ARG VITE_CLERK_PUBLISHABLE_KEY=""
+ARG VITE_CLERK_PUBLISHABLE_KEY=pk_test_cHVtcGVkLWhvdW5kLTQ5MjAuY2xlcmsuYWNjb3VudHMuZGV2JA
 ENV VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}
 
 RUN npm run build

@@ -83,7 +83,7 @@ services:
         # Inlined into the bundle at build time. Points at the
         # backend's host-published port since the browser calls it
         # directly, not through the docker network.
-        VITE_BACKEND_URL: http://localhost:${BACKEND_PORT:-5000}
+        VITE_BACKEND_URL: http://40.127.12.130:${BACKEND_PORT:-5000}
         VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:-}
     container_name: ecommerce-frontend
     restart: unless-stopped
