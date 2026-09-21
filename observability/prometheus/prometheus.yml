@@ -1,0 +1,36 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Grafana-managed alert rules (observability/grafana/provisioning/alerting/)
+# query this Prometheus datasource directly, so no separate
+# rule_files/Alertmanager block is needed here.
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Backend metrics: both the technical metrics from
+  # `@opentelemetry/auto-instrumentations-node` (HTTP request
+  # duration/count, Mongoose spans, Node runtime stats) and the custom
+  # business counters in server/src/otel/business-metrics.ts, exposed
+  # directly by the backend's own Prometheus exporter (see
+  # server/src/otel/otel-bootstrap.ts) rather than routed through the
+  # collector -- this gives a real up{job="ecommerce-backend"} signal.
+  # See observability/README.md.
+  - job_name: ecommerce-backend
+    static_configs:
+      - targets: ["backend:9464"]
+        labels:
+          service: ecommerce-backend
+
+  # Per-container CPU/memory/network utilization.
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["cadvisor:8080"]
+
+  # Host (node) CPU/memory/disk utilization.
+  - job_name: node-exporter
+    static_configs:
+      - targets: ["node-exporter:9100"]

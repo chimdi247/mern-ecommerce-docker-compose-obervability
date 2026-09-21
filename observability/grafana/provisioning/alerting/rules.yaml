@@ -1,0 +1,256 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: resource-utilization
+    folder: "Ecommerce"
+    interval: 1m
+    rules:
+      - uid: container-cpu-high
+        title: "Container CPU > 70%"
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                sum by (name) (rate(container_cpu_usage_seconds_total{name!=""}[5m])) * 100
+          - refId: C
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [70] }
+        labels:
+          severity: warning
+          scope: container
+        annotations:
+          summary: "Container {{ $labels.name }} CPU usage is above 70%"
+          description: >-
+            Container {{ $labels.name }} has averaged over 70% CPU usage for
+            more than 5 minutes.
+
+      - uid: container-memory-high
+        title: "Container Memory > 70% of limit"
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                (container_memory_usage_bytes{name!=""}
+                / on(name) container_spec_memory_limit_bytes{name!="", container_spec_memory_limit_bytes < 1e15})
+                * 100
+          - refId: C
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [70] }
+        labels:
+          severity: warning
+          scope: container
+        annotations:
+          summary: "Container {{ $labels.name }} memory usage is above 70% of its limit"
+          description: >-
+            Container {{ $labels.name }} has used over 70% of its memory
+            limit for more than 5 minutes.
+
+      - uid: node-cpu-high
+        title: "Node CPU > 70%"
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+          - refId: C
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [70] }
+        labels:
+          severity: warning
+          scope: node
+        annotations:
+          summary: "Node {{ $labels.instance }} CPU usage is above 70%"
+          description: >-
+            Host {{ $labels.instance }} has averaged over 70% CPU usage for
+            more than 5 minutes.
+
+      - uid: node-memory-high
+        title: "Node Memory > 70%"
+        condition: C
+        for: 5m
+        noDataState: NoData
+        execErrState: Error
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100
+          - refId: C
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [70] }
+        labels:
+          severity: warning
+          scope: node
+        annotations:
+          summary: "Node {{ $labels.instance }} memory usage is above 70%"
+          description: >-
+            Host {{ $labels.instance }} has used over 70% of its available
+            memory for more than 5 minutes.
+
+  - orgId: 1
+    name: ecommerce-business-logic
+    folder: "Ecommerce"
+    interval: 1m
+    rules:
+      - uid: checkout-failure-rate-high
+        title: "Checkout failure rate > 20%"
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                sum(rate(ecommerce_checkout_failed_total[15m]))
+                / (sum(rate(ecommerce_checkout_failed_total[15m])) + sum(rate(ecommerce_orders_created_total[15m])))
+                * 100
+          - refId: C
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [20] }
+        labels:
+          severity: warning
+          scope: business
+        annotations:
+          summary: "More than 20% of checkout attempts are failing"
+          description: >-
+            Over 20% of checkout session attempts have failed (out of stock,
+            unavailable products, empty cart) over the last 15 minutes --
+            check the "Checkout Failures by Reason" panel to see why.
+
+      - uid: payment-signature-invalid-spike
+        title: "Payment signature verification failures spike"
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        data:
+          - refId: A
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: sum(increase(ecommerce_payment_signature_invalid_total[15m]))
+          - refId: C
+            relativeTimeRange: { from: 900, to: 0 }
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [5] }
+        labels:
+          severity: critical
+          scope: business
+        annotations:
+          summary: "Unusual number of invalid Razorpay payment signatures"
+          description: >-
+            More than 5 checkout confirmations were rejected for an invalid
+            payment signature in the last 15 minutes -- this can indicate a
+            Razorpay integration/key mismatch, or someone attempting to
+            forge payment confirmations.
+
+      - uid: no-paid-orders-despite-checkouts
+        title: "Orders being created but none completing payment"
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        data:
+          - refId: A
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              # >0 only when checkouts are actually being attempted
+              # AND zero of them have completed payment -- avoids
+              # false positives during genuinely idle/no-traffic
+              # periods.
+              expr: >-
+                (sum(increase(ecommerce_orders_created_total[30m])) > bool 0)
+                * (sum(increase(ecommerce_orders_paid_total[30m])) == bool 0)
+          - refId: C
+            relativeTimeRange: { from: 1800, to: 0 }
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+        labels:
+          severity: critical
+          scope: business
+        annotations:
+          summary: "Checkouts are starting but no payments are completing"
+          description: >-
+            Orders have been created in the last 30 minutes but none have
+            reached paymentStatus=paid -- likely a broken payment flow
+            (Razorpay outage/misconfiguration, frontend bug on the
+            confirmation step, etc.), not just quiet traffic.

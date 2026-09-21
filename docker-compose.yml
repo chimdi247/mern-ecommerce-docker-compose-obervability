@@ -1,0 +1,283 @@
+# MERN Ecommerce - full local stack
+#
+# `docker compose up --build` brings up the app (React/Vite frontend +
+# Node/Express backend), MongoDB, and a full observability stack
+# (OpenTelemetry Collector, Prometheus, Grafana, Loki, Promtail,
+# Tempo, cAdvisor, node-exporter) -- see README.md, docker/README.md
+# (important: read this before expecting to log in -- auth is
+# Clerk-based), and observability/README.md.
+
+services:
+  # ============================================
+  # DATA STORE
+  # ============================================
+
+  mongo:
+    image: mongo:7
+    container_name: ecommerce-mongo
+    restart: unless-stopped
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    volumes:
+      - mongo_data:/data/db
+      # Creates collections/indexes and seeds a starter category on
+      # first boot. See docker/README.md.
+      - ./docker/init-db:/docker-entrypoint-initdb.d:ro
+      # Manual helper (NOT auto-run) for promoting a user to admin
+      # after they've signed in through Clerk at least once. See
+      # docker/README.md.
+      - ./docker/scripts:/scripts:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    networks:
+      - ecommerce-network
+
+  # ============================================
+  # APPLICATION
+  # ============================================
+
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: ecommerce-backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-5000}:5000"
+      - "${OTEL_PROMETHEUS_PORT:-9464}:9464"
+    env_file: .env
+    environment:
+      OTEL_SERVICE_NAME: ecommerce-backend
+      OTEL_RESOURCE_ATTRIBUTES: service.namespace=ecommerce
+    depends_on:
+      mongo:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 6
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    networks:
+      - ecommerce-network
+
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        # Inlined into the bundle at build time. Points at the
+        # backend's host-published port since the browser calls it
+        # directly, not through the docker network.
+        VITE_BACKEND_URL: http://localhost:${BACKEND_PORT:-5000}
+        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:-}
+    container_name: ecommerce-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    networks:
+      - ecommerce-network
+
+  # ============================================
+  # OBSERVABILITY
+  # ============================================
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: ecommerce-otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./observability/otel-collector/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    depends_on:
+      tempo:
+        condition: service_started
+      loki:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    networks:
+      - ecommerce-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ecommerce-prometheus
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      # Lets Tempo's metrics-generator push span-derived RED metrics
+      # here (see observability/tempo/tempo.yaml); non-fatal to the
+      # rest of the dashboard if unused.
+      - "--web.enable-remote-write-receiver"
+    ports:
+      - "${PROMETHEUS_PORT:-9091}:9090"
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - cadvisor
+      - node-exporter
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    networks:
+      - ecommerce-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ecommerce-grafana
+    restart: unless-stopped
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GF_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - ALERT_EMAIL_TO=${ALERT_EMAIL_TO:-admin@example.com}
+      - GF_ALERTING_ENABLED=false
+      - GF_UNIFIED_ALERTING_ENABLED=true
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    networks:
+      - ecommerce-network
+
+  loki:
+    image: grafana/loki:latest
+    container_name: ecommerce-loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/loki-config.yaml
+    ports:
+      - "${LOKI_PORT:-3100}:3100"
+    volumes:
+      - ./observability/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki_data:/loki
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    networks:
+      - ecommerce-network
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: ecommerce-promtail
+    restart: unless-stopped
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./observability/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - promtail_data:/var/lib/promtail
+    depends_on:
+      - loki
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+    networks:
+      - ecommerce-network
+
+  tempo:
+    image: grafana/tempo:latest
+    container_name: ecommerce-tempo
+    restart: unless-stopped
+    user: root
+    command: -config.file=/etc/tempo/tempo.yaml
+    ports:
+      - "${TEMPO_PORT:-3200}:3200"
+    volumes:
+      - ./observability/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    networks:
+      - ecommerce-network
+
+  # Per-container CPU/memory/network metrics.
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: ecommerce-cadvisor
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    networks:
+      - ecommerce-network
+
+  # Host (node) CPU/memory/disk metrics.
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: ecommerce-node-exporter
+    restart: unless-stopped
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/host/root"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+    networks:
+      - ecommerce-network
+
+volumes:
+  mongo_data:
+  prometheus_data:
+  grafana_data:
+  loki_data:
+  promtail_data:
+  tempo_data:
+
+networks:
+  ecommerce-network:
+    driver: bridge
