@@ -106,17 +106,17 @@ export function StoreHome() {
             <div className={bannerGridClass}>
               <Card className={bannerMainCardClass}>
                 <img
-                  src={mainBanner.imageUrl}
+                  src={mainBanner?.imageUrl}
                   alt="Feature Image"
                   className={bannerMainImageClass}
                 />
               </Card>
 
               <div className={bannerSideGridClass}>
-                {sideBanners.map((item) => (
+                {sideBanners?.map((item) => (
                   <Card key={item._id} className={bannerSideCardClass}>
                     <img
-                      src={item.imageUrl}
+                      src={item?.imageUrl}
                       alt="Feature Image"
                       className={bannerSideImageClass}
                     />
@@ -201,7 +201,7 @@ export function StoreHome() {
                       <CardContent className={productContentClass}>
                         <div className={productImageWrapClass}>
                           <img
-                            src={product.image}
+                            src={product?.image}
                             alt={product.title}
                             className={productImageClass}
                           />
