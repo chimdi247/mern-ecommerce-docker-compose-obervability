@@ -7,7 +7,7 @@ SCRIPT_NAME="$1" # e.g. load-test.js
 shift
 
 TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASE_URL="${BASE_URL:-http://localhost:${BACKEND_PORT:-5000}}"
+BASE_URL="${BASE_URL:-http://40.127.12.130:${BACKEND_PORT:-5000}}"
 
 echo "==> Target: ${BASE_URL}"
 echo "==> Scenario: ${SCRIPT_NAME}"

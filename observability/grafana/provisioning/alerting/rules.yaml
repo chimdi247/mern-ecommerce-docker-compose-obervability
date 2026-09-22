@@ -7,7 +7,7 @@ groups:
     interval: 1m
     rules:
       - uid: container-cpu-high
-        title: "Container CPU > 70%"
+        title: "Container CPU > 50%"
         condition: C
         for: 5m
         noDataState: NoData
@@ -29,18 +29,18 @@ groups:
               type: threshold
               expression: A
               conditions:
-                - evaluator: { type: gt, params: [70] }
+                - evaluator: { type: gt, params: [50] }
         labels:
           severity: warning
           scope: container
         annotations:
-          summary: "Container {{ $labels.name }} CPU usage is above 70%"
+          summary: "Container {{ $labels.name }} CPU usage is above 50%"
           description: >-
-            Container {{ $labels.name }} has averaged over 70% CPU usage for
+            Container {{ $labels.name }} has averaged over 50% CPU usage for
             more than 5 minutes.
 
       - uid: container-memory-high
-        title: "Container Memory > 70% of limit"
+        title: "Container Memory > 50% of limit"
         condition: C
         for: 5m
         noDataState: NoData
@@ -64,18 +64,18 @@ groups:
               type: threshold
               expression: A
               conditions:
-                - evaluator: { type: gt, params: [70] }
+                - evaluator: { type: gt, params: [50] }
         labels:
           severity: warning
           scope: container
         annotations:
-          summary: "Container {{ $labels.name }} memory usage is above 70% of its limit"
+          summary: "Container {{ $labels.name }} memory usage is above 50% of its limit"
           description: >-
-            Container {{ $labels.name }} has used over 70% of its memory
+            Container {{ $labels.name }} has used over 50% of its memory
             limit for more than 5 minutes.
 
       - uid: node-cpu-high
-        title: "Node CPU > 70%"
+        title: "Node CPU > 50%"
         condition: C
         for: 5m
         noDataState: NoData
@@ -97,18 +97,18 @@ groups:
               type: threshold
               expression: A
               conditions:
-                - evaluator: { type: gt, params: [70] }
+                - evaluator: { type: gt, params: [50] }
         labels:
           severity: warning
           scope: node
         annotations:
-          summary: "Node {{ $labels.instance }} CPU usage is above 70%"
+          summary: "Node {{ $labels.instance }} CPU usage is above 50%"
           description: >-
-            Host {{ $labels.instance }} has averaged over 70% CPU usage for
+            Host {{ $labels.instance }} has averaged over 50% CPU usage for
             more than 5 minutes.
 
       - uid: node-memory-high
-        title: "Node Memory > 70%"
+        title: "Node Memory > 50%"
         condition: C
         for: 5m
         noDataState: NoData
@@ -130,14 +130,14 @@ groups:
               type: threshold
               expression: A
               conditions:
-                - evaluator: { type: gt, params: [70] }
+                - evaluator: { type: gt, params: [50] }
         labels:
           severity: warning
           scope: node
         annotations:
-          summary: "Node {{ $labels.instance }} memory usage is above 70%"
+          summary: "Node {{ $labels.instance }} memory usage is above 50%"
           description: >-
-            Host {{ $labels.instance }} has used over 70% of its available
+            Host {{ $labels.instance }} has used over 50% of its available
             memory for more than 5 minutes.
 
   - orgId: 1
